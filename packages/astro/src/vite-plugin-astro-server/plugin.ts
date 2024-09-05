@@ -20,6 +20,10 @@ import { DevPipeline } from './pipeline.js';
 import { handleRequest } from './request.js';
 import { setRouteError } from './server-state.js';
 
+import { createServerModuleRunner } from 'vite';
+import { fileURLToPath } from 'node:url';
+import * as path from 'node:path';
+
 export interface AstroPluginOptions {
 	settings: AstroSettings;
 	logger: Logger;
@@ -33,7 +37,7 @@ export default function createVitePluginAstroServer({
 }: AstroPluginOptions): vite.Plugin {
 	return {
 		name: 'astro:server',
-		configureServer(viteServer) {
+		async configureServer(viteServer) {
 			const loader = createViteLoader(viteServer);
 			const manifest = createDevelopmentManifest(settings);
 			let manifestData: ManifestData = injectDefaultRoutes(
@@ -77,6 +81,14 @@ export default function createVitePluginAstroServer({
 
 			process.on('unhandledRejection', handleUnhandledRejection);
 
+			const __dirname = fileURLToPath(new URL('.', import.meta.url));
+
+			const moduleRunner = createServerModuleRunner(viteServer.environments['__ssr_environment__']);
+			const entrypoint = await moduleRunner.import(
+				path.join(__dirname, 'entrypoints/node-entrypoint.js'),
+			);
+			const handler = entrypoint.default.fetch;
+
 			return () => {
 				// Push this middleware to the front of the stack so that it can intercept responses.
 				// fix(#6067): always inject this to ensure zombie base handling is killed after restarts
@@ -98,6 +110,7 @@ export default function createVitePluginAstroServer({
 							controller,
 							incomingRequest: request,
 							incomingResponse: response,
+							handler,
 						});
 					});
 				});

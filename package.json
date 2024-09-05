@@ -70,6 +70,9 @@
     "typescript-eslint": "^8.3.0"
   },
   "pnpm": {
+    "overrides": {
+			"vite": "6.0.0-alpha.24"
+		},
     "peerDependencyRules": {
       "ignoreMissing": [
         "rollup",

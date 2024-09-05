@@ -295,6 +295,22 @@ export async function handleRoute({
 	await writeSSRResult(request, response, incomingResponse);
 }
 
+export async function handleRouteAlt({
+	request,
+	incomingResponse,
+	handler,
+}: {
+	request: Request;
+	incomingResponse: http.ServerResponse;
+	handler: (request: Request) => Promise<Response>;
+}): Promise<void> {
+	// const timeStart = performance.now()
+
+	const response = await handler(request);
+
+	await writeSSRResult(request, response, incomingResponse);
+}
+
 function getStatus(matchedRoute?: MatchedRoute): 404 | 500 | 200 {
 	if (!matchedRoute) return 404;
 	if (matchedRoute.route.route === '/404') return 404;

@@ -6,7 +6,8 @@ import { runWithErrorHandling } from './controller.js';
 import { recordServerError } from './error.js';
 import type { DevPipeline } from './pipeline.js';
 import { handle500Response } from './response.js';
-import { handleRoute, matchRoute } from './route.js';
+import { handleRoute, handleRouteAlt, matchRoute } from './route.js';
+import { createRequest } from '../core/request.js';
 
 type HandleRequest = {
 	pipeline: DevPipeline;
@@ -23,8 +24,9 @@ export async function handleRequest({
 	controller,
 	incomingRequest,
 	incomingResponse,
-}: HandleRequest) {
-	const { config, loader } = pipeline;
+	handler,
+}: HandleRequest & { handler: any }) {
+	const { config, loader, logger } = pipeline;
 	const origin = `${loader.isHttps() ? 'https' : 'http'}://${
 		incomingRequest.headers[':authority'] ?? incomingRequest.headers.host
 	}`;
@@ -52,24 +54,38 @@ export async function handleRequest({
 		body = Buffer.concat(bytes);
 	}
 
+	const request = createRequest({
+		base: config.base,
+		url,
+		headers: incomingRequest.headers,
+		method: incomingRequest.method,
+		body,
+		logger,
+		clientAddress: incomingRequest.socket.remoteAddress,
+		// need to apply staticLike inside the environment when the route is available
+	});
+
 	await runWithErrorHandling({
 		controller,
 		pathname,
 		async run() {
-			const matchedRoute = await matchRoute(pathname, manifestData, pipeline);
-			const resolvedPathname = matchedRoute?.resolvedPathname ?? pathname;
-			return await handleRoute({
-				matchedRoute,
-				url,
-				pathname: resolvedPathname,
-				body,
-				origin,
-				pipeline,
-				manifestData,
-				incomingRequest: incomingRequest,
-				incomingResponse: incomingResponse,
-			});
+			return await handleRouteAlt({ request, incomingResponse, handler });
 		},
+		// async run() {
+		// 	const matchedRoute = await matchRoute(pathname, manifestData, pipeline);
+		// 	const resolvedPathname = matchedRoute?.resolvedPathname ?? pathname;
+		// 	return await handleRoute({
+		// 		matchedRoute,
+		// 		url,
+		// 		pathname: resolvedPathname,
+		// 		body,
+		// 		origin,
+		// 		pipeline,
+		// 		manifestData,
+		// 		incomingRequest: incomingRequest,
+		// 		incomingResponse: incomingResponse,
+		// 	});
+		// },
 		onError(_err) {
 			const { error, errorWithMetadata } = recordServerError(loader, config, pipeline, _err);
 			handle500Response(loader, incomingResponse, errorWithMetadata);
