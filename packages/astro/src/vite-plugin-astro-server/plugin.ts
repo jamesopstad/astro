@@ -23,12 +23,15 @@ import { setRouteError } from './server-state.js';
 import { createServerModuleRunner } from 'vite';
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
+// import { writeFileSync } from 'node:fs';
 
 export interface AstroPluginOptions {
 	settings: AstroSettings;
 	logger: Logger;
 	fs: typeof fs;
 }
+
+const environmentContext = {} as { manifestData: ManifestData };
 
 export default function createVitePluginAstroServer({
 	settings,
@@ -44,6 +47,7 @@ export default function createVitePluginAstroServer({
 				manifest,
 				createRouteManifest({ settings, fsMod }, logger),
 			);
+			environmentContext.manifestData = manifestData;
 			const pipeline = DevPipeline.create(manifestData, { loader, logger, manifest, settings });
 			const controller = createController({ loader });
 			const localStorage = new AsyncLocalStorage();
@@ -112,6 +116,11 @@ export default function createVitePluginAstroServer({
 							incomingResponse: response,
 							handler,
 						});
+
+						// writeFileSync(
+						// 	'/Users/jopstad/Desktop/astro_module_keys.json',
+						// 	JSON.stringify([...moduleRunner.moduleCache.keys()]),
+						// );
 					});
 				});
 			};
@@ -122,6 +131,86 @@ export default function createVitePluginAstroServer({
 
 			// Replace the Vite overlay with ours
 			return patchOverlay(code);
+		},
+		resolveId(id) {
+			if (id.startsWith('__ssr_environment/')) {
+				return `\0virtual:${id}`;
+			}
+		},
+		load(id) {
+			if (id === '\0virtual:__ssr_environment/environment_context') {
+				const s = JSON.stringify;
+
+				const { manifestData } = environmentContext;
+
+				return `
+					export let manifest = {
+						hrefRoot: ${s(settings.config.root.toString())},
+						trailingSlash: ${s(settings.config.trailingSlash)},
+						buildFormat: ${s(settings.config.build.format)},
+						compressHTML: ${s(settings.config.compressHTML)},
+						assets: new Set(),
+						entryModules: {},
+						routes: [],
+						adapterName: ${s(settings?.adapter?.name || '')},
+						clientDirectives: new Map(${s([...settings.clientDirectives])}),
+						renderers: [],
+						base: ${s(settings.config.base)},
+						assetsPrefix: ${s(settings.config.build.assetsPrefix)},
+						site: ${s(settings.config.site)},
+						componentMetadata: new Map(),
+						inlinedScripts: new Map(),
+						i18n: ${s(
+							settings.config.i18n && {
+								fallback: settings.config.i18n.fallback,
+								strategy: toRoutingStrategy(
+									settings.config.i18n.routing,
+									settings.config.i18n.domains,
+								),
+								defaultLocale: settings.config.i18n.defaultLocale,
+								locales: settings.config.i18n.locales,
+								domainLookupTable: {},
+								fallbackType: toFallbackType(settings.config.i18n.routing),
+							},
+						)},
+						checkOrigin: ${s(settings.config.security?.checkOrigin ?? false)},
+						experimentalEnvGetSecretEnabled: false,
+
+						// key: createKey(),
+
+						middleware(_, next) {
+							return next();
+						},
+					};
+
+					export let manifestData = {
+						routes: [
+							${manifestData.routes
+								.map(
+									(route) => `
+										{
+											route: ${s(route.route)},
+											component: ${s(route.component)},
+											// generate
+											params: ${s(route.params)},
+											pathname: ${s(route.pathname)},
+											distURL: ${route.distURL ? `new URL(${route.distURL})` : 'undefined'},
+											pattern: ${route.pattern},
+											segments: ${s(route.segments)},
+											type: ${s(route.type)},
+											prerender: ${s(route.prerender)},
+											redirect: ${s(route.redirect)},
+											// redirectRoute
+											// fallbackRoutes
+											isIndex: ${s(route.isIndex)}
+										}
+							`,
+								)
+								.join(',')}
+						]
+					}
+				`;
+			}
 		},
 	};
 }

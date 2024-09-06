@@ -45,7 +45,9 @@ export class DevPipeline extends Pipeline {
 		readonly logger: Logger,
 		readonly manifest: SSRManifest,
 		readonly settings: AstroSettings,
+		// No need for this to exist separately from `settings`
 		readonly config = settings.config,
+		// This is already created in the subclass
 		readonly defaultRoutes = createDefaultRoutes(manifest),
 	) {
 		const mode = 'development';
@@ -53,7 +55,9 @@ export class DevPipeline extends Pipeline {
 		const serverLike = isServerLikeOutput(config);
 		const streaming = true;
 		super(logger, manifest, mode, [], resolve, serverLike, streaming);
+		// This could be created with the manifest
 		manifest.serverIslandMap = settings.serverIslandMap;
+		// This could be created with the manifest
 		manifest.serverIslandNameMap = settings.serverIslandNameMap;
 	}
 
@@ -80,9 +84,11 @@ export class DevPipeline extends Pipeline {
 		} = this;
 		const filePath = new URL(`${routeData.component}`, root);
 		// Add hoisted script tags, skip if direct rendering with `directRenderScript`
+		// Should `settings.config.experimental.directRenderScript` be added to manifest?
 		const { scripts } = settings.config.experimental.directRenderScript
 			? { scripts: new Set<SSRElement>() }
-			: await getScriptsForURL(filePath, settings.config.root, loader);
+			: // `settings.config.root` exists on manifest as string rather than URL
+				await getScriptsForURL(filePath, settings.config.root, loader);
 
 		// Inject HMR scripts
 		if (isPage(filePath, settings) && mode === 'development') {
@@ -211,8 +217,11 @@ export class DevPipeline extends Pipeline {
 			payload,
 			request,
 			routes: this.manifestData?.routes,
+			// This could use `this.manifest.trailingSlash`
 			trailingSlash: this.config.trailingSlash,
+			// This could use `this.manifest.buildFormat`
 			buildFormat: this.config.build.format,
+			// This could use `this.manifest.base`
 			base: this.config.base,
 		});
 

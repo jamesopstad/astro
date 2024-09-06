@@ -63,6 +63,7 @@ export async function handleRequest({
 		logger,
 		clientAddress: incomingRequest.socket.remoteAddress,
 		// need to apply staticLike inside the environment when the route is available
+		staticLike: false,
 	});
 
 	await runWithErrorHandling({

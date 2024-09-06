@@ -55,6 +55,7 @@ export class AppPipeline extends Pipeline {
 			undefined,
 			undefined,
 			false,
+			// This is already created in the subclass
 			defaultRoutes,
 		);
 		pipeline.#manifestData = manifestData;
@@ -62,6 +63,7 @@ export class AppPipeline extends Pipeline {
 	}
 
 	headElements(routeData: RouteData): Pick<SSRResult, 'scripts' | 'styles' | 'links'> {
+		// This could use `this.#manifestData.routes.find(route => route === routeData)`
 		const routeInfo = this.manifest.routes.find((route) => route.routeData === routeData);
 		// may be used in the future for handling rel=modulepreload, rel=icon, rel=manifest etc.
 		const links = new Set<never>();
@@ -98,6 +100,7 @@ export class AppPipeline extends Pipeline {
 		const { newUrl, pathname, routeData } = findRouteToRewrite({
 			payload,
 			request,
+			// This could use `this.#manifestData.routes`
 			routes: this.manifest?.routes.map((r) => r.routeData),
 			trailingSlash: this.manifest.trailingSlash,
 			buildFormat: this.manifest.buildFormat,
